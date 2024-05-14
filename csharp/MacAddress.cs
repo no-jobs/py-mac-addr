@@ -12,8 +12,24 @@ public class Program
     [DllExport]
     public static IntPtr GetMacAddressString()
     {
+#if false
         var list = GetMacAddressList();
         return StringToUTF8Addr(String.Join(":", list));
+#else
+        var list = GetNICList();
+        var result = new List<object>();
+        foreach (var nic in list)
+        {
+            result.Add(new
+            {
+                name = nic.Name,
+                addr = String.Join("-", SplitStringByLengthList(nic.GetPhysicalAddress().ToString().ToLower(), 2))
+
+            });
+        }
+        string json = new ObjectParser().Stringify(result, true);
+        return StringToUTF8Addr(json);
+#endif
     }
     public static IntPtr StringToUTF8Addr(string s)
     {
@@ -23,6 +39,15 @@ public class Program
         IntPtr nativeUtf8 = Marshal.AllocHGlobal(buffer.Length);
         Marshal.Copy(buffer, 0, nativeUtf8, buffer.Length);
         return nativeUtf8;
+    }
+    static List<NetworkInterface> GetNICList()
+    {
+        var list = NetworkInterface
+                   .GetAllNetworkInterfaces()
+                   .Where(nic => nic.OperationalStatus == OperationalStatus.Up && nic.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                   .Select(nic => nic)
+                   .ToList();
+        return list;
     }
     static List<string> GetMacAddressList()
     {
