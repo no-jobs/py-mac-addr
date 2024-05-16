@@ -47,7 +47,7 @@ public class Program
         string localIp = GetLocalIp();
         if (localIp != null)
         {
-            Console.WriteLine($"localIp={localIp}");
+            //Console.WriteLine($"localIp={localIp}");
 #if false
             foreach(NetworkInterface nic in list)
             {
