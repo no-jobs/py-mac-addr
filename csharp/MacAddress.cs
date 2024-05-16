@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -12,10 +14,6 @@ public class Program
     [DllExport]
     public static IntPtr GetMacAddressString()
     {
-#if false
-        var list = GetMacAddressList();
-        return StringToUTF8Addr(String.Join(":", list));
-#else
         var list = GetNICList();
         var result = new List<object>();
         foreach (var nic in list)
@@ -29,7 +27,6 @@ public class Program
         }
         string json = new ObjectParser().Stringify(result, true);
         return StringToUTF8Addr(json);
-#endif
     }
     public static IntPtr StringToUTF8Addr(string s)
     {
@@ -47,8 +44,44 @@ public class Program
                    .Where(nic => nic.OperationalStatus == OperationalStatus.Up && nic.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                    .Select(nic => nic)
                    .ToList();
+        string localIp = GetLocalIp();
+        if (localIp != null)
+        {
+            Console.WriteLine($"localIp={localIp}");
+#if false
+            foreach(NetworkInterface nic in list)
+            {
+                Console.WriteLine(GetIPAdressFromNIC(nic));
+            }
+#endif
+            list = list.Where(nic => GetIPAdressFromNIC(nic) == localIp).ToList();
+        }
         return list;
     }
+    static string GetLocalIp()
+    {
+        using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+        {
+            socket.Connect("8.8.8.8", 65530);
+            if (!(socket.LocalEndPoint is IPEndPoint endPoint) || endPoint.Address == null)
+            {
+                return null;
+            }
+            return endPoint.Address.ToString();
+        }
+    }
+    static string GetIPAdressFromNIC(NetworkInterface nic)
+    {
+        foreach (UnicastIPAddressInformation ip in nic.GetIPProperties().UnicastAddresses)
+        {
+            if (ip.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                return ip.Address.ToString();
+            }
+        }
+        return null;
+    }
+#if false
     static List<string> GetMacAddressList()
     {
         var list = NetworkInterface
@@ -58,6 +91,7 @@ public class Program
                    .ToList();
         return list;
     }
+#endif
     static IEnumerable<string> SplitStringByLengthLazy(string str, int maxLength)
     {
         for (int index = 0; index < str.Length; index += maxLength)
