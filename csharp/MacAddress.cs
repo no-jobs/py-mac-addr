@@ -6,14 +6,21 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace MacAddress;
 
 public class Program
 {
+    static ThreadLocal<IntPtr> JsonPtr = new ThreadLocal<IntPtr>();
     [DllExport]
     public static IntPtr GetMacAddressString()
     {
+        if (JsonPtr.Value != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(JsonPtr.Value);
+            JsonPtr.Value = IntPtr.Zero;
+        }
         var list = GetNICList();
         var result = new List<object>();
         foreach (var nic in list)
@@ -26,7 +33,8 @@ public class Program
             });
         }
         string json = new ObjectParser().Stringify(result, true);
-        return StringToUTF8Addr(json);
+        JsonPtr.Value = StringToUTF8Addr(json);
+        return JsonPtr.Value;
     }
     public static IntPtr StringToUTF8Addr(string s)
     {
