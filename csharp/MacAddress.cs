@@ -14,14 +14,37 @@ public class Program
 {
     static ThreadLocal<IntPtr> JsonPtr = new ThreadLocal<IntPtr>();
     [DllExport]
-    public static IntPtr GetMacAddressString()
+    public static IntPtr list_nic_active()
     {
         if (JsonPtr.Value != IntPtr.Zero)
         {
             Marshal.FreeHGlobal(JsonPtr.Value);
             JsonPtr.Value = IntPtr.Zero;
         }
-        var list = GetNICList();
+        var list = GetNICList(activeOnly: true);
+        var result = new List<object>();
+        foreach (var nic in list)
+        {
+            result.Add(new
+            {
+                name = nic.Name,
+                addr = String.Join("-", SplitStringByLengthList(nic.GetPhysicalAddress().ToString().ToLower(), 2))
+
+            });
+        }
+        string json = new ObjectParser().Stringify(result, true);
+        JsonPtr.Value = StringToUTF8Addr(json);
+        return JsonPtr.Value;
+    }
+    [DllExport]
+    public static IntPtr list_nic_installed()
+    {
+        if (JsonPtr.Value != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(JsonPtr.Value);
+            JsonPtr.Value = IntPtr.Zero;
+        }
+        var list = GetNICList(activeOnly: false);
         var result = new List<object>();
         foreach (var nic in list)
         {
@@ -45,7 +68,7 @@ public class Program
         Marshal.Copy(buffer, 0, nativeUtf8, buffer.Length);
         return nativeUtf8;
     }
-    static List<NetworkInterface> GetNICList()
+    static List<NetworkInterface> GetNICList(bool activeOnly)
     {
         var list = NetworkInterface
                    .GetAllNetworkInterfaces()
@@ -53,7 +76,7 @@ public class Program
                    .Select(nic => nic)
                    .ToList();
         string localIp = GetLocalIp();
-        if (localIp != null)
+        if (activeOnly && localIp != null)
         {
             //Console.WriteLine($"localIp={localIp}");
 #if false
